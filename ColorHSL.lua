@@ -1,6 +1,8 @@
 local ColorHSL = {}
 
-function ColorHSL.toHSL(color: Color3): {H: number, S: number, L: number}
+function ColorHSL.toHSL(color: Color3, degrees: boolean?): {H: number, S: number, L: number}
+	local degrees = degrees or false
+	
 	local r,g,b = color.R, color.G, color.B
 	local max, min = math.max(r,g,b), math.min(r,g,b)
 	local h,s,l
@@ -31,11 +33,12 @@ function ColorHSL.toHSL(color: Color3): {H: number, S: number, L: number}
 		h /= 6
 	end
 	
-	return {H = h, S = s, L = l}
+	return {H = degrees and h*360 or h, S = s, L = l}
 end
 
-function ColorHSL.fromHSL(h: number, s: number, l: number): Color3
-	if h > 1 then h /= 360 end
+function ColorHSL.fromHSL(h: number, s: number, l: number, degrees: boolean?): Color3
+	local degrees = degrees or h > 1
+	if degrees then h /= 360 end
 	
 	local r,g,b
 	
