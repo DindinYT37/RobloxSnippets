@@ -7,13 +7,8 @@ local function tobit(n: number)
 end
 
 local function normalize(f)
-	return function(a,b)
-		return tobit(
-			f(
-				tobit(a),
-				tobit(b)
-			)
-		)
+	return function(a, b)
+		return tobit(f(tobit(a), tobit(b)))
 	end
 end
 
@@ -24,43 +19,32 @@ local rshift = normalize(bit32.rshift)
 local lshift = normalize(bit32.lshift)
 
 local function lei2str(i)
-	local f = function(s)
-		return string.char(
-			bit32.band(
-				bit32.rshift(
-					i,
-					s
-				),
-				255
-			)
-		)
-	end
-
-	return f(0) .. f(8) .. f(16) .. f(24)
+	return string.char(band(rshift(i, 0), 255)) ..
+		   string.char(band(rshift(i, 8), 255)) ..
+		   string.char(band(rshift(i, 16), 255)) ..
+		   string.char(band(rshift(i, 24), 255))
 end
 
 local function str2bei(s)
 	local v = 0
-	for i = 1,#s do
-		v =v * 256 + string.byte(s,i)
+	for i = 1, #s do
+		v = v * 256 + s:byte(i)
 	end
 	return v
 end
 
 local function str2lei(s)
 	local v = 0
-	for i = #s,1,-1 do
-		v = v*256 + string.byte(s,i)
+	for i = #s, 1, -1 do
+		v = v * 256 + s:byte(i)
 	end
 	return v
 end
 
 local function cut_le_str(s)
 	local t = {}
-	for i = 1,61,4 do
-		t[#t+1] = str2lei(
-			string.sub(s,i,i+3)
-		)
+	for i = 1, #s, 4 do
+		t[#t + 1] = str2lei(s:sub(i, i + 3))
 	end
 	return t
 end
@@ -85,127 +69,105 @@ local Constants = {
 	0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476
 }
 
-local function f(x,y,z)
-	return bit32.bor(
-		bit32.band(x,y),
-		bit32.band(-x-1,z)
-	)
+local function f(x, y, z) return bor(band(x, y), band(bxor(x, _8F), z)) end
+
+local function g(x, y, z) return bor(band(x, z), band(y, bxor(z, _8F))) end
+
+local function h(x, y, z) return bxor(x, bxor(y, z)) end
+
+local function i(x, y, z) return bxor(y, bor(x, bxor(z, _8F))) end
+
+local function z(func, a, b, c, d, x, s, ac)
+	a = band(a + func(b, c, d) + x + ac, _8F)
+	return bor(lshift(band(a, 2^s - 1), s), rshift(a, 32 - s)) + b
 end
 
-local function g(x,y,z)
-	return bit32.bor(
-		bit32.band(x,z),
-		bit32.band(y,-z-1)
-	)
+local function transform(A, B, C, D, X)
+	local a, b, c, d = A, B, C, D
+
+	a = z(f, a, b, c, d, X[ 0],  7, Constants[ 1])
+	d = z(f, d, a, b, c, X[ 1], 12, Constants[ 2])
+	c = z(f, c, d, a, b, X[ 2], 17, Constants[ 3])
+	b = z(f, b, c, d, a, X[ 3], 22, Constants[ 4])
+	a = z(f, a, b, c, d, X[ 4],  7, Constants[ 5])
+	d = z(f, d, a, b, c, X[ 5], 12, Constants[ 6])
+	c = z(f, c, d, a, b, X[ 6], 17, Constants[ 7])
+	b = z(f, b, c, d, a, X[ 7], 22, Constants[ 8])
+	a = z(f, a, b, c, d, X[ 8],  7, Constants[ 9])
+	d = z(f, d, a, b, c, X[ 9], 12, Constants[10])
+	c = z(f, c, d, a, b, X[10], 17, Constants[11])
+	b = z(f, b, c, d, a, X[11], 22, Constants[12])
+	a = z(f, a, b, c, d, X[12],  7, Constants[13])
+	d = z(f, d, a, b, c, X[13], 12, Constants[14])
+	c = z(f, c, d, a, b, X[14], 17, Constants[15])
+	b = z(f, b, c, d, a, X[15], 22, Constants[16])
+
+	a = z(g, a, b, c, d, X[ 1],  5, Constants[17])
+	d = z(g, d, a, b, c, X[ 6],  9, Constants[18])
+	c = z(g, c, d, a, b, X[11], 14, Constants[19])
+	b = z(g, b, c, d, a, X[ 0], 20, Constants[20])
+	a = z(g, a, b, c, d, X[ 5],  5, Constants[21])
+	d = z(g, d, a, b, c, X[10],  9, Constants[22])
+	c = z(g, c, d, a, b, X[15], 14, Constants[23])
+	b = z(g, b, c, d, a, X[ 4], 20, Constants[24])
+	a = z(g, a, b, c, d, X[ 9],  5, Constants[25])
+	d = z(g, d, a, b, c, X[14],  9, Constants[26])
+	c = z(g, c, d, a, b, X[ 3], 14, Constants[27])
+	b = z(g, b, c, d, a, X[ 8], 20, Constants[28])
+	a = z(g, a, b, c, d, X[13],  5, Constants[29])
+	d = z(g, d, a, b, c, X[ 2],  9, Constants[30])
+	c = z(g, c, d, a, b, X[ 7], 14, Constants[31])
+	b = z(g, b, c, d, a, X[12], 20, Constants[32])
+
+	a = z(h, a, b, c, d, X[ 5],  4, Constants[33])
+	d = z(h, d, a, b, c, X[ 8], 11, Constants[34])
+	c = z(h, c, d, a, b, X[11], 16, Constants[35])
+	b = z(h, b, c, d, a, X[14], 23, Constants[36])
+	a = z(h, a, b, c, d, X[ 1],  4, Constants[37])
+	d = z(h, d, a, b, c, X[ 4], 11, Constants[38])
+	c = z(h, c, d, a, b, X[ 7], 16, Constants[39])
+	b = z(h, b, c, d, a, X[10], 23, Constants[40])
+	a = z(h, a, b, c, d, X[13],  4, Constants[41])
+	d = z(h, d, a, b, c, X[ 0], 11, Constants[42])
+	c = z(h, c, d, a, b, X[ 3], 16, Constants[43])
+	b = z(h, b, c, d, a, X[ 6], 23, Constants[44])
+	a = z(h, a, b, c, d, X[ 9],  4, Constants[45])
+	d = z(h, d, a, b, c, X[12], 11, Constants[46])
+	c = z(h, c, d, a, b, X[15], 16, Constants[47])
+	b = z(h, b, c, d, a, X[ 2], 23, Constants[48])
+
+	a = z(i, a, b, c, d, X[ 0],  6, Constants[49])
+	d = z(i, d, a, b, c, X[ 7], 10, Constants[50])
+	c = z(i, c, d, a, b, X[14], 15, Constants[51])
+	b = z(i, b, c, d, a, X[ 5], 21, Constants[52])
+	a = z(i, a, b, c, d, X[12],  6, Constants[53])
+	d = z(i, d, a, b, c, X[ 3], 10, Constants[54])
+	c = z(i, c, d, a, b, X[10], 15, Constants[55])
+	b = z(i, b, c, d, a, X[ 1], 21, Constants[56])
+	a = z(i, a, b, c, d, X[ 8],  6, Constants[57])
+	d = z(i, d, a, b, c, X[15], 10, Constants[58])
+	c = z(i, c, d, a, b, X[ 6], 15, Constants[59])
+	b = z(i, b, c, d, a, X[13], 21, Constants[60])
+	a = z(i, a, b, c, d, X[ 4],  6, Constants[61])
+	d = z(i, d, a, b, c, X[11], 10, Constants[62])
+	c = z(i, c, d, a, b, X[ 2], 15, Constants[63])
+	b = z(i, b, c, d, a, X[ 9], 21, Constants[64])
+
+	return bit32.band(A + a, _8F), bit32.band(B + b, _8F), bit32.band(C + c, _8F), bit32.band(D + d, _8F)
 end
 
-local function h(x,y,z)
-	return bit32.bxor(x,bit32.bxor(y,z))
-end
-
-local function i(x,y,z)
-	return bit32.bxor(y,bit32.bor(x,-z-1))
-end
-
-local function z(ff,a,b,c,d,x,s,ac)
-	a = bit32.band(a+ff(b,c,d)+x+ac,_8F)
-
-	return bit32.bor(bit32.lshift(bit32.band(a,bit32.rshift(_8F,s)),s),bit32.rshift(a,32-s)) + b
-end
-
-local function transform(A,B,C,D,X)
-	local a,b,c,d = A,B,C,D
-
-	a = z(f,a,b,c,d,X[ 0], 7,Constants[ 1])
-	d = z(f,d,a,b,c,X[ 1],12,Constants[ 2])
-	c = z(f,c,d,a,b,X[ 2],17,Constants[ 3])
-	b = z(f,b,c,d,a,X[ 3],22,Constants[ 4])
-	a = z(f,a,b,c,d,X[ 4], 7,Constants[ 5])
-	d = z(f,d,a,b,c,X[ 5],12,Constants[ 6])
-	c = z(f,c,d,a,b,X[ 6],17,Constants[ 7])
-	b = z(f,b,c,d,a,X[ 7],22,Constants[ 8])
-	a = z(f,a,b,c,d,X[ 8], 7,Constants[ 9])
-	d = z(f,d,a,b,c,X[ 9],12,Constants[10])
-	c = z(f,c,d,a,b,X[10],17,Constants[11])
-	b = z(f,b,c,d,a,X[11],22,Constants[12])
-	a = z(f,a,b,c,d,X[12], 7,Constants[13])
-	d = z(f,d,a,b,c,X[13],12,Constants[14])
-	c = z(f,c,d,a,b,X[14],17,Constants[15])
-	b = z(f,b,c,d,a,X[15],22,Constants[16])
-
-	a = z(g,a,b,c,d,X[ 1], 5,Constants[17])
-	d = z(g,d,a,b,c,X[ 6], 9,Constants[18])
-	c = z(g,c,d,a,b,X[11],14,Constants[19])
-	b = z(g,b,c,d,a,X[ 0],20,Constants[20])
-	a = z(g,a,b,c,d,X[ 5], 5,Constants[21])
-	d = z(g,d,a,b,c,X[10], 9,Constants[22])
-	c = z(g,c,d,a,b,X[15],14,Constants[23])
-	b = z(g,b,c,d,a,X[ 4],20,Constants[24])
-	a = z(g,a,b,c,d,X[ 9], 5,Constants[25])
-	d = z(g,d,a,b,c,X[14], 9,Constants[26])
-	c = z(g,c,d,a,b,X[ 3],14,Constants[27])
-	b = z(g,b,c,d,a,X[ 8],20,Constants[28])
-	a = z(g,a,b,c,d,X[13], 5,Constants[29])
-	d = z(g,d,a,b,c,X[ 2], 9,Constants[30])
-	c = z(g,c,d,a,b,X[ 7],14,Constants[31])
-	b = z(g,b,c,d,a,X[12],20,Constants[32])
-
-	a = z(h,a,b,c,d,X[ 5], 4,Constants[33])
-	d = z(h,d,a,b,c,X[ 8],11,Constants[34])
-	c = z(h,c,d,a,b,X[11],16,Constants[35])
-	b = z(h,b,c,d,a,X[14],23,Constants[36])
-	a = z(h,a,b,c,d,X[ 1], 4,Constants[37])
-	d = z(h,d,a,b,c,X[ 4],11,Constants[38])
-	c = z(h,c,d,a,b,X[ 7],16,Constants[39])
-	b = z(h,b,c,d,a,X[10],23,Constants[40])
-	a = z(h,a,b,c,d,X[13], 4,Constants[41])
-	d = z(h,d,a,b,c,X[ 0],11,Constants[42])
-	c = z(h,c,d,a,b,X[ 3],16,Constants[43])
-	b = z(h,b,c,d,a,X[ 6],23,Constants[44])
-	a = z(h,a,b,c,d,X[ 9], 4,Constants[45])
-	d = z(h,d,a,b,c,X[12],11,Constants[46])
-	c = z(h,c,d,a,b,X[15],16,Constants[47])
-	b = z(h,b,c,d,a,X[ 2],23,Constants[48])
-
-	a = z(i,a,b,c,d,X[ 0], 6,Constants[49])
-	d = z(i,d,a,b,c,X[ 7],10,Constants[50])
-	c = z(i,c,d,a,b,X[14],15,Constants[51])
-	b = z(i,b,c,d,a,X[ 5],21,Constants[52])
-	a = z(i,a,b,c,d,X[12], 6,Constants[53])
-	d = z(i,d,a,b,c,X[ 3],10,Constants[54])
-	c = z(i,c,d,a,b,X[10],15,Constants[55])
-	b = z(i,b,c,d,a,X[ 1],21,Constants[56])
-	a = z(i,a,b,c,d,X[ 8], 6,Constants[57])
-	d = z(i,d,a,b,c,X[15],10,Constants[58])
-	c = z(i,c,d,a,b,X[ 6],15,Constants[59])
-	b = z(i,b,c,d,a,X[13],21,Constants[60])
-	a = z(i,a,b,c,d,X[ 4], 6,Constants[61])
-	d = z(i,d,a,b,c,X[11],10,Constants[62])
-	c = z(i,c,d,a,b,X[ 2],15,Constants[63])
-	b = z(i,b,c,d,a,X[ 9],21,Constants[64])
-
-
-	return bit32.band(A+a,_8F), bit32.band(B+b,_8F), bit32.band(C+c,_8F),bit32.band(D+d,_8F)
-end
-
-----------------------------------------------------------------
-
-function md5._update(self,s)
+function md5._update(self, s)
 	self.pos += #s
 	s = self.buf .. s
 
-	for i = 1,#s-63,64 do
-		local x = cut_le_str(
-			string.sub(s,i,i+63)
-		)
+	for i = 1, #s - 63, 64 do
+		local x = cut_le_str(s:sub(i, i + 63))
 		assert(#x == 16)
-		x[0] = table.remove(x,1)
-		self.a, self.b, self.c, self.d = transform(
-			self.a, self.b, self.c, self.d, x
-		)
+		x[0] = table.remove(x, 1)
+		self.a, self.b, self.c, self.d = transform(self.a, self.b, self.c, self.d, x)
 	end
 
-	self.buf = string.sub(s, math.floor(#s/64)*64 + 1, #s)
+	self.buf = s:sub(math.floor(#s / 64) * 64 + 1, #s)
 	return self
 end
 
@@ -216,15 +178,14 @@ function md5._finish(self)
 	if msgLen % 64 > 56 then padLen += 64 end
 	if padLen == 0 then padLen = 64 end
 
-	local s = string.char(128) .. string.rep(string.char(0),padLen-1) .. lei2str(bit32.band(8*msgLen,_8F)) .. lei2str(math.floor(msgLen/0x20000000))
-	md5._update(self,s)
+	local s = string.char(128) .. string.rep(string.char(0), padLen - 1) ..
+			  lei2str(bit32.band(8 * msgLen, _8F)) .. lei2str(math.floor(msgLen / 0x20000000))
+	md5._update(self, s)
 
 	assert(self.pos % 64 == 0)
 
 	return lei2str(self.a) .. lei2str(self.b) .. lei2str(self.c) .. lei2str(self.d)
 end
-
-----------------------------------------------------------------
 
 function md5.new()
 	return {
@@ -242,10 +203,10 @@ end
 function md5.tohex(s)
 	return string.format(
 		"%08x%08x%08x%08x",
-		str2bei(string.sub(s, 1, 4)),
-		str2bei(string.sub(s, 5, 8)),
-		str2bei(string.sub(s, 9,12)),
-		str2bei(string.sub(s,13,16))
+		str2bei(s:sub(1, 4)),
+		str2bei(s:sub(5, 8)),
+		str2bei(s:sub(9, 12)),
+		str2bei(s:sub(13, 16))
 	)
 end
 
