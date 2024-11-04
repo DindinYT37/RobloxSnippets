@@ -10,40 +10,43 @@ function ColorHSL.toHSL(color: Color3, degrees: boolean?): {H: number, S: number
 	local sum = max + min
 	local diff = max - min
 
-	l = (max + min) / 2
+	l = sum / 2
 	if max == min then
-		h,s = 0,0
+		h,s = 0,0 -- Achromatic
 	else
 		if l > 0.5 then
 			s = diff / (2-diff)
 		else
-			s = diff / (sum)
+			s = diff / sum
 		end
 		
 		if max == r then
-			h = (g-b) / d
+			h = (g-b) / diff
 			if g < b then
 				h += 6
 			end
 		elseif max == g then
-			h = (b-r) / d+2
+			h = (b-r) / diff+2
 		elseif max == b then
-			h = (r-g) / d+4
+			h = (r-g) / diff+4
 		end
 		
 		h /= 6
 	end
 	
-	return {H = degrees and h*360 or h, S = s, L = l}
+	if degrees then h *= 360 end
+	return {H = h, S = s, L = l}
 end
 
 local function h2rgb(p,q,t)
 	if t < 0 then t += 1 end
 	if t > 1 then t -= 1 end
 
-	if t < 1/6 then return p + (q-p) * 6 * t end
+	local qp = (q-p)
+
+	if t < 1/6 then return p + qp*6 * t end
 	if t < 0.5 then return q end
-	if t < 2/3 then return p + (q-p) * (2/3 - t) * 6 end
+	if t < 2/3 then return p + qp*(2/3 - t) * 6 end
 
 	return p
 end
@@ -55,7 +58,7 @@ function ColorHSL.fromHSL(h: number, s: number, l: number, degrees: boolean?): C
 	local r,g,b
 	
 	if s == 0 then
-		r,g,b = l,l,l
+		r,g,b = l,l,l -- Achromatic
 	else
 		local q = l < 0.5 and l * (1+s) or l+s - l*s
 		local p = 2*l - q
