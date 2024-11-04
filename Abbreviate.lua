@@ -12,22 +12,27 @@ local abbreviations = {
 	Ct = 300, UnCt = 303, DuoCt = 306,
 }
 
+local function formatWithDecimals(n: number, decimals: number): string
+	local format = string.format("%%.%df", decimals)
+	return string.format(format, n)
+end
+
 local function Abbreviate(n: number, decimals: number?, forceDecimals: boolean?): string
-	local decimals = decimals or 2
-	local forceDecimals = forceDecimals or false
+	decimals = decimals and math.floor(decimals) or 2
+	forceDecimals = forceDecimals or false
 	
-	if number < 100 then
+	if n < 100 then
 		if forceDecimals then
-			return string.format(`%.{decimals}f`,number), ""
+			return formatWithDecimals(n, decimals), ""
 		end
 		local pow = 10^decimals
-		return math.floor(number * pow) / pow, ""
+		return math.floor(n * pow) / pow, ""
 	end
 	
-	local floored = math.floor(number)
+	local floored = math.floor(n)
 	local s = string.format("%d",floored)
+	local chosen = nil
 	
-	local chosen = next(abbreviations)
 	for abbreviation, digits in pairs(abbreviations) do
 		if math.floor(math.log10(floored) + 1) >= digits and math.floor(math.log10(floored) + 1) < (digits + 3) then
 			chosen = abbreviation
@@ -37,11 +42,16 @@ local function Abbreviate(n: number, decimals: number?, forceDecimals: boolean?)
 	
 	if chosen then
 		local digits = abbreviations[chosen]
-		
+		local s = formatWithDecimals(n / 10^(digits-1), decimals)
+
+		if decimals > 0 and decimals < 5 and not forceDecimals then
+			s = string.gsub(s, "%.0+$", "")
+			s = string.gsub(s, "(%..-)[0]+$", "%1")
+		end
+
+		--[[
 		local pow = 10^(digits-(decimals+1))
-		local rounded = math.floor(number/pow) * pow
-		
-		s = string.format(`%.{decimals}f`,n/10^(digits-1))
+		local rounded = math.floor(n/pow) * pow
 
 		if decimals > 0 and decimals < 5 and not forceDecimals then
 			local last = string.sub(s,-1)
@@ -55,10 +65,11 @@ local function Abbreviate(n: number, decimals: number?, forceDecimals: boolean?)
 				s = string.sub(s,1,-2)
 			end
 		end
+		--]]
 
 		s ..= chosen
 	else
-		s = number
+		s = tostring(n)
 	end
 
 	return s, (chosen or "")
