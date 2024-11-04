@@ -12,4 +12,4 @@ local function Random(min: number, max: number): number
 	return min + _Random:NextNumber()*(max-min)
 end
 
-return Percentage, OneInX
+return Percentage, OneInX, Random
