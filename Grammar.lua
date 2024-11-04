@@ -1,14 +1,14 @@
-local endings = [[!"€$%&/()=?{}[]\´`*+~'#.:,;]]
+local endings = [[!"ï¿½$%&/()=?{}[]\ï¿½`*+~'#.:,;]]
 
-local function lastLetter(s: string)
+local function lastLetter(s: string): string
 	if not s then return "" end
 	return s:sub(#s,-1)
 end
-local function firstLetter(s: string)
+local function firstLetter(s: string): string
 	if not s then return "" end
 	return s:sub(1,1)
 end
-local function replaceFirst(s: string, w: string)
+local function replaceFirst(s: string, w: string): string
 	if not s then return "" end
 	return w .. s:sub(2)
 end
@@ -23,18 +23,17 @@ local function getOccurrences(s: string, func: ((string) -> (string))?): number
 	return occurrences / #s
 end
 
-local function isLower(s)
+local function isLower(s: string): boolean
 	return string.lower(s) == s
 end
-local function isUpper(s)
+local function isUpper(s: string): boolean
 	return string.upper(s) == s
 end
 
-local function validEnding(e)
+local function validEnding(e: string): boolean
 	for d in string.gmatch(endings,".") do
-		if d == e then
-			return true
-		end
+		if d ~= e then continue end
+		return true
 	end
 	return false
 end

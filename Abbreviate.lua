@@ -12,20 +12,20 @@ local abbreviations = {
 	Ct = 300, UnCt = 303, DuoCt = 306,
 }
 
-local function Abbreviate(number: number, decimals: number?, forceDecimals: boolean?): string
+local function Abbreviate(n: number, decimals: number?, forceDecimals: boolean?): string
 	local decimals = decimals or 2
 	local forceDecimals = forceDecimals or false
 	
-	if number < 1000 then
+	if number < 100 then
 		if forceDecimals then
 			return string.format(`%.{decimals}f`,number), ""
-		else
-			return math.floor(number * 10^decimals) / 10^decimals, ""
 		end
+		local pow = 10^decimals
+		return math.floor(number * pow) / pow, ""
 	end
 	
 	local floored = math.floor(number)
-	local s = string.format("%d", floored)
+	local s = string.format("%d",floored)
 	
 	local chosen = next(abbreviations)
 	for abbreviation, digits in pairs(abbreviations) do
@@ -38,29 +38,29 @@ local function Abbreviate(number: number, decimals: number?, forceDecimals: bool
 	if chosen then
 		local digits = abbreviations[chosen]
 		
-		local rounded = math.floor(number / 10 ^ (digits - (decimals+1))) * 10 ^ (digits - (decimals+1))
-		local n = rounded
-		local m = digits
-		s = string.format(`%.{decimals}f`, n / 10 ^ (m-1))
+		local pow = 10^(digits-(decimals+1))
+		local rounded = math.floor(number/pow) * pow
 		
+		s = string.format(`%.{decimals}f`,n/10^(digits-1))
+
 		if decimals > 0 and decimals < 5 and not forceDecimals then
-			local last = s:sub(-1)
-			
+			local last = string.sub(s,-1)
+
 			while last == "0" do
-				s = s:sub(1,-2)
-				last = s:sub(-1)
+				s = string.sub(s,1,-2)
+				last = string.sub(s,-1)
 			end
-			
+
 			if last == "." then
-				s = s:sub(1,-2)
+				s = string.sub(s,1,-2)
 			end
 		end
-		
-		s = s .. chosen
+
+		s ..= chosen
 	else
 		s = number
 	end
-	
+
 	return s, (chosen or "")
 end
 

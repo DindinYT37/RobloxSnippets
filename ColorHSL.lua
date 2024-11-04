@@ -7,16 +7,17 @@ function ColorHSL.toHSL(color: Color3, degrees: boolean?): {H: number, S: number
 	local max, min = math.max(r,g,b), math.min(r,g,b)
 	local h,s,l
 	
+	local sum = max + min
+	local diff = max - min
+
 	l = (max + min) / 2
 	if max == min then
 		h,s = 0,0
 	else
-		local d = max - min
-		
 		if l > 0.5 then
-			s = d / (2-max-min)
+			s = diff / (2-diff)
 		else
-			s = d / (max+min)
+			s = diff / (sum)
 		end
 		
 		if max == r then
@@ -36,6 +37,17 @@ function ColorHSL.toHSL(color: Color3, degrees: boolean?): {H: number, S: number
 	return {H = degrees and h*360 or h, S = s, L = l}
 end
 
+local function h2rgb(p,q,t)
+	if t < 0 then t += 1 end
+	if t > 1 then t -= 1 end
+
+	if t < 1/6 then return p + (q-p) * 6 * t end
+	if t < 0.5 then return q end
+	if t < 2/3 then return p + (q-p) * (2/3 - t) * 6 end
+
+	return p
+end
+
 function ColorHSL.fromHSL(h: number, s: number, l: number, degrees: boolean?): Color3
 	local degrees = degrees or h > 1
 	if degrees then h /= 360 end
@@ -45,17 +57,6 @@ function ColorHSL.fromHSL(h: number, s: number, l: number, degrees: boolean?): C
 	if s == 0 then
 		r,g,b = l,l,l
 	else
-		local h2rgb = function(p,q,t)
-			if t < 0 then t += 1 end
-			if t > 1 then t -= 1 end
-
-			if t < 1/6 then return p + (q-p) * 6 * t end
-			if t < 0.5 then return q end
-			if t < 2/3 then return p + (q-p) * (2/3 - t) * 6 end
-
-			return p
-		end
-
 		local q = l < 0.5 and l * (1+s) or l+s - l*s
 		local p = 2*l - q
 
