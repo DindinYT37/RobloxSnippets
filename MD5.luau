@@ -1,6 +1,11 @@
 local md5 = {}
 
-local _8F = 0xFFFFFFFF
+local BYTE_MASK = 255  -- 0xFF
+local WORD_MASK = 0xFFFFFFFF
+local BITS_PER_BYTE = 8
+local MD5_BLOCK_SIZE = 64
+local PADDING_BYTE = string.char(128)
+local NULL_BYTE = string.char(0)
 
 local function tobit(n: number)
 	return n <= 0x7fffffff and n or -(bit32.bnot(n) + 1)
@@ -19,10 +24,13 @@ local rshift = normalize(bit32.rshift)
 local lshift = normalize(bit32.lshift)
 
 local function lei2str(i)
-	return string.char(band(rshift(i, 0), 255)) ..
-		   string.char(band(rshift(i, 8), 255)) ..
-		   string.char(band(rshift(i, 16), 255)) ..
-		   string.char(band(rshift(i, 24), 255))
+	local t = {
+		string.char(band(i, BYTE_MASK)),
+		string.char(band(rshift(i, 8), BYTE_MASK)),
+		string.char(band(rshift(i, 16), BYTE_MASK)),
+		string.char(band(rshift(i, 24), BYTE_MASK))
+	}
+	return table.concat(t)
 end
 
 local function str2bei(s)
@@ -69,16 +77,16 @@ local Constants = {
 	0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476
 }
 
-local function f(x, y, z) return bor(band(x, y), band(bxor(x, _8F), z)) end
+local function f(x, y, z) return bor(band(x, y), band(bxor(x, WORD_MASK), z)) end
 
-local function g(x, y, z) return bor(band(x, z), band(y, bxor(z, _8F))) end
+local function g(x, y, z) return bor(band(x, z), band(y, bxor(z, WORD_MASK))) end
 
 local function h(x, y, z) return bxor(x, bxor(y, z)) end
 
-local function i(x, y, z) return bxor(y, bor(x, bxor(z, _8F))) end
+local function i(x, y, z) return bxor(y, bor(x, bxor(z, WORD_MASK))) end
 
 local function z(func, a, b, c, d, x, s, ac)
-	a = band(a + func(b, c, d) + x + ac, _8F)
+	a = band(a + func(b, c, d) + x + ac, WORD_MASK)
 	return bor(lshift(band(a, 2^s - 1), s), rshift(a, 32 - s)) + b
 end
 
@@ -153,41 +161,63 @@ local function transform(A, B, C, D, X)
 	c = z(i, c, d, a, b, X[ 2], 15, Constants[63])
 	b = z(i, b, c, d, a, X[ 9], 21, Constants[64])
 
-	return bit32.band(A + a, _8F), bit32.band(B + b, _8F), bit32.band(C + c, _8F), bit32.band(D + d, _8F)
+	return bit32.band(A + a, WORD_MASK), bit32.band(B + b, WORD_MASK), bit32.band(C + c, WORD_MASK), bit32.band(D + d, WORD_MASK)
 end
 
 function md5._update(self, s)
-	self.pos += #s
-	s = self.buf .. s
-
-	for i = 1, #s - 63, 64 do
-		local x = cut_le_str(s:sub(i, i + 63))
+	local pos = self.pos
+	local buf = self.buf
+	pos = pos + #s
+	s = buf .. s
+	
+	local len = #s
+	local blockCount = math.floor(len / MD5_BLOCK_SIZE)
+	
+	for i = 1, blockCount * MD5_BLOCK_SIZE, MD5_BLOCK_SIZE do
+		local x = cut_le_str(s:sub(i, i + MD5_BLOCK_SIZE - 1))
 		assert(#x == 16)
 		x[0] = table.remove(x, 1)
 		self.a, self.b, self.c, self.d = transform(self.a, self.b, self.c, self.d, x)
 	end
-
-	self.buf = s:sub(math.floor(#s / 64) * 64 + 1, #s)
+	
+	self.pos = pos
+	self.buf = s:sub(blockCount * MD5_BLOCK_SIZE + 1, len)
 	return self
 end
 
 function md5._finish(self)
 	local msgLen = self.pos
-	local padLen = 56 - msgLen % 64
+	local padLen = 56 - msgLen % MD5_BLOCK_SIZE
 
-	if msgLen % 64 > 56 then padLen += 64 end
-	if padLen == 0 then padLen = 64 end
+	if msgLen % MD5_BLOCK_SIZE > 56 then 
+		padLen = padLen + MD5_BLOCK_SIZE 
+	end
+	if padLen == 0 then 
+		padLen = MD5_BLOCK_SIZE 
+	end
 
-	local s = string.char(128) .. string.rep(string.char(0), padLen - 1) ..
-			  lei2str(bit32.band(8 * msgLen, _8F)) .. lei2str(math.floor(msgLen / 0x20000000))
-	md5._update(self, s)
+	local lowBits = lei2str(bit32.band(BITS_PER_BYTE * msgLen, WORD_MASK))
+	local highBits = lei2str(math.floor(msgLen / 0x20000000))
+	
+	local padding = PADDING_BYTE .. string.rep(NULL_BYTE, padLen - 1)
+	md5._update(self, padding .. lowBits .. highBits)
 
-	assert(self.pos % 64 == 0)
-
+	assert(self.pos % MD5_BLOCK_SIZE == 0)
 	return lei2str(self.a) .. lei2str(self.b) .. lei2str(self.c) .. lei2str(self.d)
 end
 
-function md5.new()
+type MD5State = {
+	a: number,
+	b: number,
+	c: number,
+	d: number,
+	pos: number,
+	buf: string,
+	update: (self: MD5State, s: string) -> MD5State,
+	finish: (self: MD5State) -> string
+}
+
+function md5.new(): MD5State
 	return {
 		a = Constants[65],
 		b = Constants[66],

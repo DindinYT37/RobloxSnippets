@@ -3,12 +3,11 @@ return function(s: Script|LocalScript|ModuleScript): string?
 		return nil
 	end
 
-	if s:IsA("LocalScript") then return "LocalScript" end
-	if s:IsA("ModuleScript") then return "ModuleScript" end
-
-	if s:IsA("Script") then
-		return (s.RunContext and tostring(s.RunContext) or "Unknown")
+	local className = s.ClassName
+	if className == "LocalScript" or className == "ModuleScript" then
+		return className
 	end
-
-	return "Unknown"
+	
+	-- At this point we know it's a regular Script
+	return tostring(s.RunContext) or "Unknown"
 end

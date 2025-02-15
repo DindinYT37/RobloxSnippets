@@ -1,12 +1,11 @@
-local pattern = "[%w%p]+"
-local special = "%p+"
+local pattern = "([%w]+)([%p]*)"
 
 return function(input: string): string
-	local acronym: string = ""
-
-	for v in string.gmatch(input, pattern) do
-		acronym ..= string.sub(v,1,1) .. (string.match(v,special) or "")
+	local acronym = table.create(#input)
+	
+	for word, punctuation in string.gmatch(input, pattern) do
+		table.insert(acronym, string.sub(word, 1, 1) .. punctuation)
 	end
 
-	return acronym
+	return table.concat(acronym)
 end

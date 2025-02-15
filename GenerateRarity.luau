@@ -1,49 +1,59 @@
-local Rarities = {
-	[1] = { -- Index
-		Name = "COMMON", -- Name of Rarity
-		Chance = 63 -- Chance in percent
+type Rarity = {
+	Name: string,
+	Chance: number,
+	CumulativeChance: number
+}
+
+local Rarities: {[number]: Rarity} = {
+	[1] = {
+		Name = "COMMON",
+		Chance = 63,
+		CumulativeChance = 0
 	},
 	[2] = {
 		Name = "UNCOMMON",
-		Chance = 30
+		Chance = 30,
+		CumulativeChance = 0
 	},
 	[3] = {
 		Name = "RARE",
-		Chance = 5
+		Chance = 5,
+		CumulativeChance = 0
 	},
 	[4] = {
 		Name = "EPIC",
-		Chance = 1.9
+		Chance = 1.9,
+		CumulativeChance = 0
 	},
 	[5] = {
 		Name = "LEGENDARY",
-		Chance = 0.1
+		Chance = 0.1,
+		CumulativeChance = 0
 	}
 }
 
--- Setup
-Rarities[4].Chance += Rarities[5].Chance
-Rarities[3].Chance += Rarities[4].Chance
-Rarities[2].Chance += Rarities[3].Chance
-Rarities[1].Chance += Rarities[2].Chance
+-- Validate total probability is 100%
+local totalProbability = 0
+for _, rarity in Rarities do
+	totalProbability += rarity.Chance
+end
+assert(math.abs(totalProbability - 100) < 0.0001, "Rarity chances must sum to 100%")
 
-local function isWithin(x: number, min: number, max: number): boolean
-	return ((x > min) and (x <= max))
+-- Pre-calculate cumulative probabilities
+local currentSum = 0
+for i = #Rarities, 1, -1 do
+	currentSum += Rarities[i].Chance
+	Rarities[i].CumulativeChance = currentSum
 end
 
 return function(): string
-	local r = Random.new(math.random(100000000,999999999))
-	local n = r.NextNumber(r) * 100
+	local randomValue = Random.new():NextNumber() * 100
 	
-	for i = 1,#Rarities do
-		if isWithin(
-			n,
-			(i == #Rarities and 0 or Rarities[i+1].Chance), -- 0 if last index, next rarity's chance if not
-			Rarities[i].Chance
-			) then
-			return Rarities[i].Name
+	for _, rarity in Rarities do
+		if randomValue <= rarity.CumulativeChance then
+			return rarity.Name
 		end
 	end
 	
-	return "ERROR"
+	return Rarities[1].Name -- Fallback to COMMON in case of floating-point precision issues
 end

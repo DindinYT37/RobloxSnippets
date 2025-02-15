@@ -1,3 +1,9 @@
+-- Cache frequently used functions
+local floor = math.floor
+local format = string.format
+local log10 = math.log10
+local gsub = string.gsub
+
 local abbreviations = {
 	K = 4, M = 7, B = 10, T = 13, Qa = 16, Qi = 19, Sx = 22, Sp = 25, Oc = 28, No = 31,
 	Dc = 34, UnDc = 37, DuoDc = 40, TreDc = 43, QtDc = 46, QiDc = 49, SxDc = 52, SpDc = 55, OcDc = 58, NvDc = 61,
@@ -12,67 +18,56 @@ local abbreviations = {
 	Ct = 300, UnCt = 303, DuoCt = 306,
 }
 
+-- Pre-sort abbreviations by digits for faster lookup
+local sortedAbbreviations = {}
+for abbr, digits in pairs(abbreviations) do
+	table.insert(sortedAbbreviations, {abbr = abbr, digits = digits})
+end
+table.sort(sortedAbbreviations, function(a, b) return a.digits < b.digits end)
+
 local function formatWithDecimals(n: number, decimals: number): string
-	local format = string.format("%%.%df", decimals)
-	return string.format(format, n)
+	return format("%." .. decimals .. "f", n)
 end
 
-local function Abbreviate(n: number, decimals: number?, forceDecimals: boolean?): string
-	decimals = decimals and math.floor(decimals) or 2
+local function Abbreviate(n: number, decimals: number?, forceDecimals: boolean?): (string, string)
+	assert(type(n) == "number", "First argument must be a number")
+	decimals = decimals and floor(decimals) or 2
 	forceDecimals = forceDecimals or false
-	
+
 	if n < 100 then
 		if forceDecimals then
 			return formatWithDecimals(n, decimals), ""
 		end
 		local pow = 10^decimals
-		return math.floor(n * pow) / pow, ""
+		return floor(n * pow) / pow, ""
 	end
+
+	local floored = floor(n)
+	local numberLength = floor(log10(floored) + 1)
 	
-	local floored = math.floor(n)
-	local s = string.format("%d",floored)
+	-- Find the appropriate abbreviation using the sorted table
 	local chosen = nil
-	
-	for abbreviation, digits in pairs(abbreviations) do
-		if math.floor(math.log10(floored) + 1) >= digits and math.floor(math.log10(floored) + 1) < (digits + 3) then
-			chosen = abbreviation
+	for _, entry in ipairs(sortedAbbreviations) do
+		if numberLength >= entry.digits and numberLength < (entry.digits + 3) then
+			chosen = entry.abbr
 			break
 		end
 	end
-	
+
 	if chosen then
 		local digits = abbreviations[chosen]
-		local s = formatWithDecimals(n / 10^(digits-1), decimals)
+		local formatted = formatWithDecimals(n / 10^(digits-1), decimals)
 
 		if decimals > 0 and decimals < 5 and not forceDecimals then
-			s = string.gsub(s, "%.0+$", "")
-			s = string.gsub(s, "(%..-)[0]+$", "%1")
+			-- Remove trailing zeros and decimal point if necessary
+			formatted = gsub(formatted, "%.0+$", "")
+			formatted = gsub(formatted, "(%..-)[0]+$", "%1")
 		end
 
-		--[[
-		local pow = 10^(digits-(decimals+1))
-		local rounded = math.floor(n/pow) * pow
-
-		if decimals > 0 and decimals < 5 and not forceDecimals then
-			local last = string.sub(s,-1)
-
-			while last == "0" do
-				s = string.sub(s,1,-2)
-				last = string.sub(s,-1)
-			end
-
-			if last == "." then
-				s = string.sub(s,1,-2)
-			end
-		end
-		--]]
-
-		s ..= chosen
-	else
-		s = tostring(n)
+		return formatted .. chosen, chosen
 	end
 
-	return s, (chosen or "")
+	return tostring(n), ""
 end
 
 return Abbreviate

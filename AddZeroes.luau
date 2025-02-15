@@ -14,19 +14,29 @@ Decimals are not capped by `x`:
 -8.6221 = -008.6221
 --]]
 local function AddZeroes(n: number, x: number): string
-	local s,d = unpack(
-		tostring(n):split(".")
-	)
+	-- Handle invalid inputs
+	assert(type(n) == "number", "First argument must be a number")
+	assert(type(x) == "number" and x > 0, "Second argument must be a positive number")
 	
-	s = string.format(`%0{x}d`, tonumber(s))
+	local str = tostring(n)
+	local parts = str:split(".")
+	local intPart = parts[1]
+	local decPart = parts[2]
 	
-	s ..= d and ("." .. d) or ""
+	-- Format the integer part with leading zeros
+	local formatted = string.format(`%0${x}d`, math.abs(tonumber(intPart)))
 	
-	if n < 0 then
-		s = "-" .. s:sub(2)
+	-- Add back the decimal part if it exists
+	if decPart then
+		formatted ..= "." .. decPart
 	end
 	
-	return s
+	-- Add back the negative sign if needed
+	if n < 0 then
+		formatted = "-" .. formatted
+	end
+	
+	return formatted
 end
 
 return AddZeroes

@@ -1,119 +1,80 @@
-local Alphabet = {
-	65, 66, 67, 68, 69, 70,
-	71, 72, 73, 74, 75, 76,
-	77, 78, 79, 80, 81, 82,
-	83, 84, 85, 86, 87, 88, 89, 90,
-	97, 98, 99, 100, 101, 102,
-	103, 104, 105, 106, 107,
-	108, 109, 110, 111, 112,
-	113, 114, 115, 116, 117,
-	118, 119, 120, 121, 122,
-	48, 49, 50, 51, 52, 53,
-	54, 55, 56, 57, 43, 47
-}
-
-local Indexes = {
-	[43] = 63, [47] = 64, [48] = 53, [49] = 54, [50] = 55, [51] = 56,
-	[52] = 57, [53] = 58, [54] = 59, [55] = 60, [56] = 61, [57] = 62,
-	[65] = 1, [66] = 2, [67] = 3, [68] = 4, [69] = 5, [70] = 6, [71] = 7,
-	[72] = 8, [73] = 9, [74] = 10, [75] = 11, [76] = 12, [77] = 13,
-	[78] = 14, [79] = 15, [80] = 16, [81] = 17, [82] = 18, [83] = 19,
-	[84] = 20, [85] = 21, [86] = 22, [87] = 23, [88] = 24, [89] = 25,
-	[90] = 26, [97] = 27, [98] = 28, [99] = 29, [100] = 30, [101] = 31,
-	[102] = 32, [103] = 33, [104] = 34, [105] = 35, [106] = 36, [107] = 37,
-	[108] = 38, [109] = 39, [110] = 40, [111] = 41, [112] = 42, [113] = 43,
-	[114] = 44, [115] = 45, [116] = 46, [117] = 47, [118] = 48, [119] = 49,
-	[120] = 50, [121] = 51, [122] = 52,
-}
+-- Pre-computed lookup tables as strings for better performance
+local ENCODING_TABLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+local DECODING_TABLE = {}
+for i = 1, #ENCODING_TABLE do
+	DECODING_TABLE[string.byte(ENCODING_TABLE, i)] = i - 1
+end
 
 local function Encode(input: string): string
-	local output = {}
-	local length = 0
+	assert(type(input) == "string", "Base64.Encode: Expected string input")
+	if input == "" then return "" end
 
-	for index = 1, #input, 3 do
-		local byte1, byte2, byte3 = string.byte(input, index, index + 2)
-
-		-- Compute Base64 values
+	-- Use string.gsub for more efficient processing
+	return (string.gsub(input, "..?.?", function(chunk)
+		local byte1, byte2, byte3 = string.byte(chunk, 1, 3)
+		
 		local base64_1 = bit32.rshift(byte1, 2)
 		local base64_2 = bit32.lshift(bit32.band(byte1, 3), 4) + bit32.rshift(byte2 or 0, 4)
-		local base64_3 = bit32.lshift(bit32.band(byte2 or 0, 15), 2) + bit32.rshift(byte3 or 0, 6)
-		local base64_4 = bit32.band(byte3 or 0, 63)
+		local base64_3 = byte2 and (bit32.lshift(bit32.band(byte2, 15), 2) + bit32.rshift(byte3 or 0, 6)) or 0
+		local base64_4 = byte3 and bit32.band(byte3, 63) or 0
 
-		length += 1
-		output[length] = Alphabet[base64_1 + 1]
-
-		length += 1
-		output[length] = Alphabet[base64_2 + 1]
-
-		length += 1
-		output[length] = byte2 and Alphabet[base64_3 + 1] or 61  -- 61 is the ASCII code for '='
-
-		length += 1
-		output[length] = byte3 and Alphabet[base64_4 + 1] or 61
-	end
-
-	-- Combine output into chunks of size 4096 to prevent memory issues
-	local encodedOutput = {}
-	local encodedLength = 0
-
-	for index = 1, length, 4096 do
-		encodedLength = encodedLength + 1
-		encodedOutput[encodedLength] = string.char(table.unpack(
-			output,
-			index,
-			math.min(index + 4096 - 1, length)
-		))
-	end
-
-	return table.concat(encodedOutput)
+		if not byte2 then
+			return string.sub(ENCODING_TABLE, base64_1 + 1, base64_1 + 1) ..
+				   string.sub(ENCODING_TABLE, base64_2 + 1, base64_2 + 1) .. 
+				   "=="
+		elseif not byte3 then
+			return string.sub(ENCODING_TABLE, base64_1 + 1, base64_1 + 1) ..
+				   string.sub(ENCODING_TABLE, base64_2 + 1, base64_2 + 1) ..
+				   string.sub(ENCODING_TABLE, base64_3 + 1, base64_3 + 1) .. 
+				   "="
+		else
+			return string.sub(ENCODING_TABLE, base64_1 + 1, base64_1 + 1) ..
+				   string.sub(ENCODING_TABLE, base64_2 + 1, base64_2 + 1) ..
+				   string.sub(ENCODING_TABLE, base64_3 + 1, base64_3 + 1) ..
+				   string.sub(ENCODING_TABLE, base64_4 + 1, base64_4 + 1)
+		end
+	end))
 end
 
 local function Decode(input: string): string
-	local output = {}
-	local length = 0
+	assert(type(input) == "string", "Base64.Decode: Expected string input")
+	assert(#input % 4 == 0, "Base64.Decode: Input length must be divisible by 4")
+	if input == "" then return "" end
 
-	-- Process input in chunks of 4 characters
-	for index = 1, #input, 4 do
-		local char1, char2, char3, char4 = string.byte(input, index, index + 3)
+	-- Remove padding if present
+	input = string.gsub(input, "=+$", "")
 
-		-- Map characters to original values
-		local index1 = Indexes[char1] - 1
-		local index2 = Indexes[char2] - 1
-		local index3 = (Indexes[char3] or 1) - 1
-		local index4 = (Indexes[char4] or 1) - 1
-
-		local byte1 = bit32.lshift(index1, 2) + bit32.rshift(index2, 4)
-		local byte2 = bit32.lshift(bit32.band(index2, 15), 4) + bit32.rshift(index3, 2)
-		local byte3 = bit32.lshift(bit32.band(index3, 3), 6) + index4
-
-		length += 1
-		output[length] = byte1
-
-		if char3 ~= 61 then -- 61 is the ASCII code for '='
-			length += 1
-			output[length] = byte2
+	return (string.gsub(input, "...?...?...?...?", function(chunk)
+		local bytes = {}
+		
+		-- Convert Base64 characters to their index values
+		for i = 1, #chunk do
+			local char = string.byte(chunk, i)
+			local value = DECODING_TABLE[char]
+			assert(value ~= nil, "Base64.Decode: Invalid character in input")
+			bytes[i] = value
 		end
 
-		if char4 ~= 61 then
-			length += 1
-			output[length] = byte3
+		-- Convert groups of 4 characters into 3 bytes
+		local result = {}
+		local byte1 = bit32.lshift(bytes[1], 2) + bit32.rshift(bytes[2], 4)
+		result[1] = string.char(byte1)
+
+		if bytes[3] then
+			local byte2 = bit32.lshift(bit32.band(bytes[2], 15), 4) + bit32.rshift(bytes[3], 2)
+			result[2] = string.char(byte2)
 		end
-	end
 
-	-- Combine output into chunks of size 4096 to prevent memory issues
-	local decodedOutput = {}
-	local decodedLength = 0
+		if bytes[4] then
+			local byte3 = bit32.lshift(bit32.band(bytes[3], 3), 6) + bytes[4]
+			result[3] = string.char(byte3)
+		end
 
-	for index = 1, length, 4096 do
-		decodedLength = decodedLength + 1
-		decodedOutput[decodedLength] = string.char(table.unpack(
-			output,
-			index,
-			math.min(index + 4096 - 1, length)
-		))
-	end
-
-	return table.concat(decodedOutput)
+		return table.concat(result)
+	end))
 end
 
-return Encode, Decode
+return {
+	encode = Encode,
+	decode = Decode,
+}

@@ -1,15 +1,26 @@
+local Chance = {}
+
 local _Random = Random.new()
 
-local function Percentage(decimal: number): boolean
-	return (_Random:NextNumber() < (tonumber(decimal) or 0))
+function Chance.Percentage(decimal: number): boolean
+	assert(type(decimal) == "number", "Percentage expects a number")
+	assert(decimal >= 0 and decimal <= 1, "Percentage must be between 0 and 1")
+	
+	return _Random:NextNumber() < decimal
 end
 
-local function OneInX(x: number): boolean
-	return (_Random:NextNumber() < (tonumber(1/x) or 0))
+function Chance.OneInX(x: number): boolean
+	assert(type(x) == "number", "OneInX expects a number")
+	assert(x > 0, "OneInX denominator must be positive")
+
+	return _Random:NextNumber() < 1/x
 end
 
-local function Random(min: number, max: number): number
-	return min + _Random:NextNumber()*(max-min)
+function Chance.Random(min: number, max: number): number
+	assert(type(min) == "number" and type(max) == "number", "Random expects two numbers")
+	assert(max > min, "Maximum must be greater than minimum")
+
+	return min + _Random:NextNumber() * (max - min)
 end
 
-return Percentage, OneInX, Random
+return Chance
