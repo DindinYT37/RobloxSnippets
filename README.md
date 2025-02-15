@@ -2,12 +2,12 @@
 
 <div align="center">
 
-[![License](https://img.shields.io/github/license/DindinYT37/roblox-utils)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/DindinYT37/roblox-utils?style=social)](https://github.com/DindinYT37/roblox-utils/stargazers)
 [![Twitter](https://img.shields.io/twitter/follow/DindinYT37?style=social)](https://twitter.com/DindinYT37)
 [![Discord](https://img.shields.io/badge/Discord-@dindinyt-7289DA?logo=discord&logoColor=white)](https://discord.com)
 
-A comprehensive collection of utility functions and snippets for Roblox development, designed to make your coding experience smoother and more efficient.
+A curated collection of high-performance Roblox utility functions, featuring optimized snippets for number manipulation, string operations, cryptography, and more. Each module is thoroughly tested and ready for production use.
 
 [Installation](#installation) • [Features](#features) • [Usage](#usage) • [Contributing](#contributing) • [License](#license)
 
