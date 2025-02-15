@@ -83,7 +83,7 @@ Each module is self-contained and can be required independently. Here's a quick 
 local Abbreviate = require(game:GetService("ReplicatedStorage").Abbreviate)
 local formatted = Abbreviate(1500) -- Returns "1.5K"
 
-local Map = require(path.to.Map)
+local Map = require(game:GetService("ReplicatedStorage").Map)
 local mapped = Map(50, 0, 100, 0, 1) -- Maps 50 from range 0-100 to range 0-1
 ```
 
